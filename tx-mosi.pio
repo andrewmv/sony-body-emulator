@@ -16,7 +16,7 @@
 
 .define T_BIT   1                       ; Cycles to wait between clock edges
 .define T_BYTE  15                      ; Cycles to wait between octets
-.define BYTECOUNT 5                     ; Number of octets to shift 
+.define BYTECOUNT 4                     ; Number of octets to shift, minus one
 
 .wrap_target
     set y BYTECOUNT     side 0  [T_BYTE]    ; Init byte counter, wait 64us
