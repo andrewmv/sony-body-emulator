@@ -17,8 +17,7 @@
 #include "rx-miso.pio.h"
 #include "tx-mosi.pio.h"
 
-/* Callback for RX DMA control chain (packet fully received)
-*/
+// Callback for RX DMA control chain (packet fully received)
 void dma_callback() {
     dma_channel_acknowledge_irq0(miso_dma_chan);
     // Stop the PIO from trying to clock in any more data
@@ -33,19 +32,63 @@ void dma_callback() {
     }
 }
 
+// Take over control of the CLK GPIO and assert a pulse of time_us
+void assert_clk(uint8_t time_us) {
+    gpio_init(CLK);
+    gpio_set_dir(CLK, GPIO_OUT);
+    gpio_put(CLK, 1);
+    sleep_us(time_us);
+    gpio_put(CLK, 0);
+}
+
+// Pull TRIG low for 15ms to fire the flash
+void assert_trig() {
+    gpio_put(TRIG, 0);
+    sleep_ms(15);
+    gpio_put(TRIG, 1);
+}
+
+// Take over control of the CLK GPIO and block until a 90us clock pulse is received
+void wait_for_flash_ready() {
+    gpio_init(CLK);
+    gpio_set_dir(CLK, GPIO_IN);
+    while()
+}
+
+// Start a simulation of a TTL metered flash
+// pf_power: The power of the pre-flash metering strobe (MOSI byte 10)
+// fe_power: The power of the final exposure flash, calculated through-the-lens based on the pre-flash
+void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
+    // Send pre-flash metering initialization packet
+
+    // Wait for the flash to send back a READY frame  - a 90us clock pulse asserted by the flash
+    wait_for_flash_ready();
+
+    // Signal the pre-flash to strobe - a 90us clock pulse asserted by the body
+    assert_clk(MISO_INIT_US);
+
+    // Spend ~50ms pretending to do TTL calculations
+    sleep_ms(50);
+
+    // Send an adjusted exposure flash initialization packet
+
+    // Wait for the flash to send back another READY frame
+    wait_for_flash_ready();
+
+    // Trigger the exposure flash by pulling TRIG low
+    assert_trig();
+}
+
 // Configure the PIOs and DMA for a flash-to-body transfer
 void start_miso_rx() {
     // Track what state we're in (not using this yet)
     state = STATE_RX_MISO;
 
     // Assert start pulse
-    gpio_init(CLK);
-    gpio_set_dir(CLK, GPIO_OUT);
-    gpio_put(CLK, 1);
-    sleep_us(MISO_INIT_US);
-    gpio_put(CLK, 0);
-    pio_gpio_init(miso_pio, CLK);
+    assert_clk(MISO_INIT_US);
 
+    // Hand GPIO control to PIO
+    pio_gpio_init(miso_pio, CLK);
     pio_gpio_init(miso_pio, DATA);
 
     // Restart and Enable PIO SM (sets ISR shift counter to Empty)
@@ -66,11 +109,7 @@ void start_mosi_tx() {
     state = STATE_TX_MOSI;
     
     // Assert start pulse
-    gpio_init(CLK);
-    gpio_set_dir(CLK, GPIO_OUT);
-    gpio_put(CLK, 1);
-    sleep_us(MOSI_INIT_US);
-    gpio_put(CLK, 0);
+    assert_clk(MOSI_INIT_US);
     pio_gpio_init(mosi_pio, CLK);
 
     // Attach DATA pin function to TX PIO and set direction
