@@ -1,0 +1,55 @@
+; Sony MI-SPI state machine for receiving data in the MISO direction
+; (Reading data sent from a real flash)
+; 2023/04 Andrew Villeneuve
+
+; Pin mapping:
+; IN 0 = DATA
+; SIDE 0 = CLK
+
+; The MISO START pulse will have already been sent when the SM starts,
+; so the first CLK pulse we send should be for a data bit
+
+.program rx_miso
+.side_set 1
+
+.define T_BIT   1                       ; Cycles to wait between clock edges
+.define T_BYTE  15                      ; Cycles to wait between octets
+
+.wrap_target
+    set x 7         side 0  [T_BYTE]    ; Init bit counter, wait 160us
+bitloop:
+    nop             side 1  [T_BIT]     ; set clock high for 8us
+    in pins 1       side 0              ; set clock low, read DATA
+    jmp x-- bitloop side 0              ; branch then decrement bit counter
+.wrap
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+static inline void rx_miso_program_init(PIO pio, uint sm, uint offset, uint clkpin, uint datapin) {
+    pio_sm_config c = rx_miso_program_get_default_config(offset);
+
+    // Map Clock to SIDE pin 0, Data to IN pin 0
+    sm_config_set_sideset_pins(&c, clkpin);
+    sm_config_set_in_pins(&c, datapin);
+
+    // Set pins functions as PIO 
+    pio_gpio_init(pio, clkpin);
+    pio_gpio_init(pio, datapin);
+
+    // Set DATA pin as input, CLK as output
+    pio_sm_set_consecutive_pindirs(pio, sm, clkpin, 1, true);
+    pio_sm_set_consecutive_pindirs(pio, sm, datapin, 1, false);
+
+    // ISR Shift: LSB first, Autopush enabled, every 8 bits
+    sm_config_set_in_shift(&c, true, true, 8);
+
+    // Setup clock divider - we want each PIO cycle to be about 4us
+    float div = clock_get_hz(clk_sys) / 125000 / 2;
+    sm_config_set_clkdiv(&c, div);
+
+    // Load our configuration, and jump to the start of the program
+    pio_sm_init(pio, sm, offset, &c);
+
+}
+%}
