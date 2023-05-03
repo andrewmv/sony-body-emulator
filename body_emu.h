@@ -40,6 +40,7 @@
 uint8_t old_flash_packet[flash_packet_length];
 uint8_t new_flash_packet[flash_packet_length];
 
+// This must also be seperately defined as a constant in tx-mosi.pio
 #define body_packet_length 5
 const uint8_t body_packet[] = {
     0x12, 0x34, 0x56, 0x78, 0x9a
