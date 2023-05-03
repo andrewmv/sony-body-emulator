@@ -36,14 +36,27 @@
 #define STATE_METERING_EF 4
 #define STATE_RECHARGE 5
 
+// Define timeouts
+
+// Maximum time between end of PF init packet from body and PF ready signal from flash
+#define TIMEOUT_PF_READY_US 10
+
 #define flash_packet_length 26
 uint8_t old_flash_packet[flash_packet_length];
 uint8_t new_flash_packet[flash_packet_length];
 
 // This must also be seperately defined as a constant in tx-mosi.pio
-#define body_packet_length 5
+#define body_packet_length 14
 const uint8_t body_packet[] = {
-    0x12, 0x34, 0x56, 0x78, 0x9a
+    0x21, 0x9c, 0x2b, 0xff, 0xae, 0xfd, 0x40, 0x40, 0x6b, 0x00, 0xe3, 0x75, 0x80, 0x00
+};
+
+const uint8_t body_packet_pf[] = {
+    0x21, 0x9c, 0x2b, 0xff, 0xae, 0x7d, 0x40, 0x40, 0x5b, 0xf8, 0xc0, 0x75, 0x80, 0x00
+};
+
+const uint8_t body_packet_ef[] = {
+    0x21, 0x9c, 0x2b, 0xff, 0xae, 0x7d, 0x40, 0xc0, 0x4b, 0xd0, 0xc0, 0x75, 0x80, 0x00
 };
 
 volatile absolute_time_t risetime;
@@ -65,7 +78,7 @@ void miso_dma_setup(PIO pio, uint sm, uint dma_chan);
 void generate_clock_byte();
 void generate_clock_multibyte(int count);
 void start_miso_rx();
-void start_mosi_tx();
+void start_mosi_tx(const uint8_t *data);
 
 // Functions used for generating testing a testing clock when TESTCLOCK is defined
 void generate_miso_packet_clock();

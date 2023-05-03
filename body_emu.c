@@ -32,6 +32,19 @@ void dma_callback() {
     }
 }
 
+void uart_rx_callback() {
+    while (uart_is_readable(uart0)) {
+        uint8_t ch = uart_getc(uart0);
+        if (uart_is_writable(uart0)) {
+            if (ch == '\r') {
+                uart_puts(uart0, "\r\n");
+            } else {
+                uart_putc(uart0, ch);
+            }
+        }
+    }
+}
+
 // Take over control of the CLK GPIO and assert a pulse of time_us
 void assert_clk(uint8_t time_us) {
     gpio_init(CLK);
@@ -52,7 +65,11 @@ void assert_trig() {
 void wait_for_flash_ready() {
     gpio_init(CLK);
     gpio_set_dir(CLK, GPIO_IN);
-    while()
+    absolute_time_t waitstart = get_absolute_time();
+    absolute_time_t waitend = waitstart;
+    while((gpio_get(CLK) == 0) && (absolute_time_diff_us(waitend, waitstart) < TIMEOUT_PF_READY_US)) {
+        waitend = get_absolute_time();
+    }
 }
 
 // Start a simulation of a TTL metered flash
@@ -60,7 +77,9 @@ void wait_for_flash_ready() {
 // fe_power: The power of the final exposure flash, calculated through-the-lens based on the pre-flash
 void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
     // Send pre-flash metering initialization packet
+    start_mosi_tx(body_packet_pf);
 
+    state = STATE_METERING_PF;
     // Wait for the flash to send back a READY frame  - a 90us clock pulse asserted by the flash
     wait_for_flash_ready();
 
@@ -71,6 +90,7 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
     sleep_ms(50);
 
     // Send an adjusted exposure flash initialization packet
+    start_mosi_tx(body_packet_ef);
 
     // Wait for the flash to send back another READY frame
     wait_for_flash_ready();
@@ -104,7 +124,7 @@ void start_miso_rx() {
 }
 
 // Configure the PIOs and DMA for a body-to-flash transfer
-void start_mosi_tx() {
+void start_mosi_tx(const u_int8_t *data) {
     // Track what state we're in (not using this yet)
     state = STATE_TX_MOSI;
     
@@ -125,7 +145,7 @@ void start_mosi_tx() {
     pio_sm_exec_wait_blocking(mosi_pio, mosi_sm, pio_encode_jmp(mosi_offset));
 
     // Start DMA to fill RX FIFO
-    dma_channel_set_read_addr(mosi_dma_chan, body_packet, true);
+    dma_channel_set_read_addr(mosi_dma_chan, data, true);
 }
 
 // Configure DMA to feed data to the PIO state machine for
@@ -182,6 +202,9 @@ int main() {
     // Setup Serial
     stdio_init_all();
     printf("Body Emulator Ready\n");
+    irq_set_exclusive_handler(UART0_IRQ, uart_rx_callback);
+    irq_set_enabled(UART0_IRQ, true);
+    uart_set_irq_enables(uart0, true, false);
 
     // Setup GPIO
     gpio_init(PICO_DEFAULT_LED_PIN);
@@ -210,7 +233,7 @@ int main() {
 
     while(true) {
         sleep_ms(15);
-        start_mosi_tx();
+        start_mosi_tx(body_packet);
         sleep_ms(15);
         start_miso_rx();
     }
