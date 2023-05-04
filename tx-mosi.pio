@@ -14,19 +14,18 @@
 .program tx_mosi
 .side_set 1
 
-.define T_BIT   1                       ; Cycles to wait between clock edges
-.define T_BYTE  15                      ; Cycles to wait between octets
-.define BYTECOUNT 13                    ; Number of octets to shift, minus one
+.define BYTECOUNT 13                        ; Number of octets to shift, minus one
 
 .wrap_target
-    set y BYTECOUNT     side 0  [T_BYTE]    ; Init byte counter, wait 64us
+    set y BYTECOUNT     side 0              ; Init byte counter
 newbyte:
-    set x 7             side 0  [T_BYTE]    ; Init bit counter, wait 64us
+    set x 7             side 0  [15]        ; Init bit counter, wait 64us 
+    nop                 side 0  [15]        ; Wait another 64us (total 128us)
 bitloop:
-    nop                 side 1  [T_BIT]     ; set clock high for 8us
+    nop                 side 1  [1]         ; set clock high for 8us
     out pins 1          side 0              ; write DATA, set clock low
     jmp x-- bitloop     side 0              ; branch then decrement bit counter
-    jmp y-- newbyte     side 0  [T_BYTE]    ; wait, branch, then decrement byte counter
+    jmp y-- newbyte     side 0  [7]        ; wait 32us, branch, then decrement byte counter
 halt:
     jmp halt            side 0
 .wrap

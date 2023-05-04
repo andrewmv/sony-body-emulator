@@ -87,6 +87,8 @@ bool wait_for_flash_ready(uint16_t timeout) {
 void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
     // Send pre-flash metering initialization packet
     start_mosi_tx(body_packet_pf);
+    // Wait for packet to finish sending - TODO handle this with an interrupt
+    sleep_ms(4);
 
     // Wait for the flash to send back a READY frame  - a 90us clock pulse asserted by the flash
     if (wait_for_flash_ready(TIMEOUT_PF_READY_MS) == false) {
@@ -118,6 +120,8 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
 void start_miso_rx() {
     // Assert start pulse
     assert_clk(MISO_INIT_US);
+    // Add 192us to the built-in 128us built-in delay between the start pulse and the first bit to get to 320us
+    sleep_us(192);
 
     // Hand GPIO control to PIO
     pio_gpio_init(miso_pio, CLK);
@@ -140,6 +144,8 @@ void start_mosi_tx(const u_int8_t *data) {
     // Assert start pulse
     assert_clk(MOSI_INIT_US);
     pio_gpio_init(mosi_pio, CLK);
+    // Add 192us to the built-in 128us built-in delay between the start pulse and the first bit to get to 320us
+    sleep_us(192);
 
     // Attach DATA pin function to TX PIO and set direction
     pio_gpio_init(mosi_pio, DATA);
@@ -220,7 +226,7 @@ int main() {
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
     gpio_init(TRIG);
-    gpio_set_dir(TRIG, GPIO_OUT);
+    gpio_set_dir(TRIG, GPIO_IN);
     gpio_pull_up(TRIG);
 
     // Setup PIO State Machine

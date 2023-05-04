@@ -12,15 +12,14 @@
 .program rx_miso
 .side_set 1
 
-.define T_BIT   1                       ; Cycles to wait between clock edges
-.define T_BYTE  15                      ; Cycles to wait between octets
-
 .wrap_target
-    set x 7         side 0  [T_BYTE]    ; Init bit counter, wait 160us
+    set x 7         side 0  [15]        ; Init bit counter, wait 15 cycles (64us)
+    nop             side 0  [15]        ; wait another 64us (128 total)
 bitloop:
-    nop             side 1  [T_BIT]     ; set clock high for 8us
+    nop             side 1  [1]         ; set clock high for two cycles (8us)
     in pins 1       side 0              ; set clock low, read DATA
     jmp x-- bitloop side 0              ; branch then decrement bit counter
+    nop             side 0  [7]         ; wait another 32us
 .wrap
 
 % c-sdk {
