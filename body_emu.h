@@ -27,19 +27,25 @@
 #define MISO_INIT_US 80
 #define MOSI_INIT_US 150
 #define FLASH_READY_US 260
+// Time between the start of one packet and the start of the next
+#define PACKET_INTERVAL_MS 16
 
 // Define machine states
-#define STATE_IDLE 0
+#define STATE_STANDBY 0
 #define STATE_RX_MISO 1
 #define STATE_TX_MOSI 2
 #define STATE_METERING_PF 3
 #define STATE_METERING_EF 4
 #define STATE_RECHARGE 5
+#define STATE_READY_TIMEOUT 6
 
 // Define timeouts
 
 // Maximum time between end of PF init packet from body and PF ready signal from flash
-#define TIMEOUT_PF_READY_US 10
+#define TIMEOUT_PF_READY_MS 10
+
+// Maximum time between end of EF exposure correction packet from body and EF ready signal from flash
+#define TIMEOUT_EF_READY_MS 10
 
 #define flash_packet_length 26
 uint8_t old_flash_packet[flash_packet_length];
@@ -60,7 +66,7 @@ const uint8_t body_packet_ef[] = {
 };
 
 volatile absolute_time_t risetime;
-volatile uint8_t state = STATE_IDLE;
+volatile uint8_t state = STATE_STANDBY;
 
 // DMA and PIO variables
 const PIO miso_pio = pio0;

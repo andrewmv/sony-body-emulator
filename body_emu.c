@@ -38,11 +38,17 @@ void uart_rx_callback() {
         if (uart_is_writable(uart0)) {
             if (ch == '\r') {
                 uart_puts(uart0, "\r\n");
+                state = STATE_METERING_PF;
             } else {
                 uart_putc(uart0, ch);
             }
         }
     }
+}
+
+int64_t alarm_callback(alarm_id_t id, void *user_data) {
+    state = STATE_READY_TIMEOUT;
+    return 0;
 }
 
 // Take over control of the CLK GPIO and assert a pulse of time_us
@@ -62,13 +68,16 @@ void assert_trig() {
 }
 
 // Take over control of the CLK GPIO and block until a 90us clock pulse is received
-void wait_for_flash_ready() {
+bool wait_for_flash_ready(uint16_t timeout) {
     gpio_init(CLK);
     gpio_set_dir(CLK, GPIO_IN);
-    absolute_time_t waitstart = get_absolute_time();
-    absolute_time_t waitend = waitstart;
-    while((gpio_get(CLK) == 0) && (absolute_time_diff_us(waitend, waitstart) < TIMEOUT_PF_READY_US)) {
-        waitend = get_absolute_time();
+    alarm_id_t ai = add_alarm_in_us(timeout, alarm_callback, NULL, false);
+    while((gpio_get(CLK) == 0) && (state != STATE_READY_TIMEOUT)) {}
+    cancel_alarm(ai);
+    if (state == STATE_READY_TIMEOUT) {
+        return false;
+    } else {
+        return true;
     }
 }
 
@@ -79,21 +88,27 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
     // Send pre-flash metering initialization packet
     start_mosi_tx(body_packet_pf);
 
-    state = STATE_METERING_PF;
     // Wait for the flash to send back a READY frame  - a 90us clock pulse asserted by the flash
-    wait_for_flash_ready();
+    if (wait_for_flash_ready(TIMEOUT_PF_READY_MS) == false) {
+        printf("PF READY Timeout\n");
+        return;
+    }
 
     // Signal the pre-flash to strobe - a 90us clock pulse asserted by the body
     assert_clk(MISO_INIT_US);
 
     // Spend ~50ms pretending to do TTL calculations
+    state = STATE_METERING_EF;
     sleep_ms(50);
 
     // Send an adjusted exposure flash initialization packet
     start_mosi_tx(body_packet_ef);
 
     // Wait for the flash to send back another READY frame
-    wait_for_flash_ready();
+    if (wait_for_flash_ready(TIMEOUT_EF_READY_MS) == false) {
+        printf("EF READY Timeout\n");
+        return;
+    }
 
     // Trigger the exposure flash by pulling TRIG low
     assert_trig();
@@ -101,9 +116,6 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
 
 // Configure the PIOs and DMA for a flash-to-body transfer
 void start_miso_rx() {
-    // Track what state we're in (not using this yet)
-    state = STATE_RX_MISO;
-
     // Assert start pulse
     assert_clk(MISO_INIT_US);
 
@@ -125,9 +137,6 @@ void start_miso_rx() {
 
 // Configure the PIOs and DMA for a body-to-flash transfer
 void start_mosi_tx(const u_int8_t *data) {
-    // Track what state we're in (not using this yet)
-    state = STATE_TX_MOSI;
-    
     // Assert start pulse
     assert_clk(MOSI_INIT_US);
     pio_gpio_init(mosi_pio, CLK);
@@ -232,9 +241,18 @@ int main() {
     irq_set_enabled(DMA_IRQ_0, true);
 
     while(true) {
-        sleep_ms(15);
-        start_mosi_tx(body_packet);
-        sleep_ms(15);
         start_miso_rx();
+        sleep_ms(PACKET_INTERVAL_MS);
+        start_mosi_tx(body_packet);
+        sleep_ms(PACKET_INTERVAL_MS);
+        if (state == STATE_RECHARGE) {
+            sleep_ms(200);
+            state = STATE_STANDBY;
+        }
+        if (state == STATE_METERING_PF) {
+            simulate_ttl_flash(0, 0);
+            sleep_ms(20);
+            state = STATE_RECHARGE;
+        }
     }
 }
