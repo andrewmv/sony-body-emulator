@@ -19,7 +19,7 @@ bitloop:
     nop             side 1  [1]         ; set clock high for two cycles (8us)
     in pins 1       side 0              ; set clock low, read DATA
     jmp x-- bitloop side 0              ; branch then decrement bit counter
-    nop             side 0  [7]         ; wait another 32us
+    nop             side 0  [4]         ; wait another 20us
 .wrap
 
 % c-sdk {
