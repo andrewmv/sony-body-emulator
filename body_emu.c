@@ -62,16 +62,19 @@ void assert_clk(uint8_t time_us) {
 
 // Pull TRIG low for 15ms to fire the flash
 void assert_trig() {
-    gpio_set_outover(TRIG, GPIO_OVERRIDE_LOW);
+    gpio_put(TRIG, 0);
+    gpio_set_dir(TRIG, GPIO_OUT);
+    // gpio_set_outover(TRIG, GPIO_OVERRIDE_LOW);
     sleep_ms(15);
-    gpio_set_outover(TRIG, GPIO_OVERRIDE_NORMAL);
+    // gpio_set_outover(TRIG, GPIO_OVERRIDE_NORMAL);
+    gpio_set_dir(TRIG, GPIO_IN);
 }
 
 // Take over control of the CLK GPIO and block until a 90us clock pulse is received
 bool wait_for_flash_ready(uint16_t timeout) {
     gpio_init(CLK);
     gpio_set_dir(CLK, GPIO_IN);
-    alarm_id_t ai = add_alarm_in_us(timeout, alarm_callback, NULL, false);
+    alarm_id_t ai = add_alarm_in_ms(timeout, alarm_callback, NULL, false);
     while((gpio_get(CLK) == 0) && (state != STATE_READY_TIMEOUT)) {}
     cancel_alarm(ai);
     if (state == STATE_READY_TIMEOUT) {
@@ -88,7 +91,7 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
     // Send pre-flash metering initialization packet
     start_mosi_tx(body_packet_pf);
     // Wait for packet to finish sending 
-    sleep_ms(5);
+    sleep_us(4300);
 
     // Wait for the flash to send back a READY frame  - a 90us clock pulse asserted by the flash
     if (wait_for_flash_ready(TIMEOUT_PF_READY_MS) == false) {
@@ -97,6 +100,7 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
     }
 
     // Signal the pre-flash to strobe - a 90us clock pulse asserted by the body
+    sleep_ms(15);
     assert_clk(MISO_INIT_US);
 
     // Spend ~50ms pretending to do TTL calculations
@@ -105,6 +109,7 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
 
     // Send an adjusted exposure flash initialization packet
     start_mosi_tx(body_packet_ef);
+    sleep_us(4300);
 
     // Wait for the flash to send back another READY frame
     if (wait_for_flash_ready(TIMEOUT_EF_READY_MS) == false) {
