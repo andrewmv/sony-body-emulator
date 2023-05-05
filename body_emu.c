@@ -62,9 +62,9 @@ void assert_clk(uint8_t time_us) {
 
 // Pull TRIG low for 15ms to fire the flash
 void assert_trig() {
-    gpio_put(TRIG, 0);
+    gpio_set_outover(TRIG, GPIO_OVERRIDE_LOW);
     sleep_ms(15);
-    gpio_put(TRIG, 1);
+    gpio_set_outover(TRIG, GPIO_OVERRIDE_NORMAL);
 }
 
 // Take over control of the CLK GPIO and block until a 90us clock pulse is received
@@ -227,7 +227,6 @@ int main() {
 
     gpio_init(TRIG);
     gpio_set_dir(TRIG, GPIO_IN);
-    gpio_pull_up(TRIG);
 
     // Setup PIO State Machine
     miso_offset = pio_add_program(miso_pio, &rx_miso_program);
