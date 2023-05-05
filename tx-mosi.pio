@@ -24,7 +24,7 @@ newbyte:
 bitloop:
     out pins 1          side 1  [1]         ; write DATA, set clock high, wait 8us
     jmp x-- bitloop     side 0  [1]         ; set clock low, branch, decrement bit counter, wait 8us
-    jmp y-- newbyte     side 0  [3]         ; wait 16us, branch, decrement byte counter
+    jmp y-- newbyte     side 0  [4]         ; wait 20us, branch, decrement byte counter
 halt:
     jmp halt            side 0
 .wrap
