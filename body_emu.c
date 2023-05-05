@@ -87,8 +87,8 @@ bool wait_for_flash_ready(uint16_t timeout) {
 void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
     // Send pre-flash metering initialization packet
     start_mosi_tx(body_packet_pf);
-    // Wait for packet to finish sending - TODO handle this with an interrupt
-    sleep_ms(4);
+    // Wait for packet to finish sending 
+    sleep_ms(5);
 
     // Wait for the flash to send back a READY frame  - a 90us clock pulse asserted by the flash
     if (wait_for_flash_ready(TIMEOUT_PF_READY_MS) == false) {
@@ -247,9 +247,9 @@ int main() {
     irq_set_enabled(DMA_IRQ_0, true);
 
     while(true) {
-        start_miso_rx();
-        sleep_ms(PACKET_INTERVAL_MS);
         start_mosi_tx(body_packet);
+        sleep_ms(PACKET_INTERVAL_MS);
+        start_miso_rx();
         sleep_ms(PACKET_INTERVAL_MS);
         if (state == STATE_RECHARGE) {
             sleep_ms(200);
