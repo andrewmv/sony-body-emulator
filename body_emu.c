@@ -267,6 +267,7 @@ int main() {
             state = STATE_STANDBY;
         }
         if (state == STATE_METERING_PF) {
+            sleep_ms(8);    // We need a double interval before the PF Init packet
             simulate_ttl_flash(0, 0);
             sleep_ms(20);
             state = STATE_RECHARGE;
