@@ -128,8 +128,8 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
 void start_miso_rx() {
     // Assert start pulse
     assert_clk(MISO_INIT_US);
-    // Add 192us to the built-in 128us built-in delay between the start pulse and the first bit to get to 320us
-    sleep_us(192);
+    // Add 412us to the built-in 128us built-in delay between the start pulse and the first bit to get to 540us
+    sleep_us(412);
 
     // Hand GPIO control to PIO
     pio_gpio_init(miso_pio, CLK);
