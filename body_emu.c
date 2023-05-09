@@ -39,6 +39,9 @@ void uart_rx_callback() {
             if (ch == '\r') {
                 uart_puts(uart0, "\r\n");
                 state = STATE_METERING_PF;
+            } else if (ch == 'r') {
+                uart_puts(uart0, "\r\n");
+                state = STATE_READY;
             } else {
                 uart_putc(uart0, ch);
             }
@@ -251,7 +254,11 @@ int main() {
     irq_set_enabled(DMA_IRQ_0, true);
 
     while(true) {
-        start_mosi_tx(body_packet);
+        if (state == STATE_READY) {
+            start_mosi_tx(body_packet_ready);
+        } else {
+            start_mosi_tx(body_packet);
+        }
         sleep_ms(PACKET_INTERVAL_MS);
         start_miso_rx();
         sleep_ms(PACKET_INTERVAL_MS);
