@@ -24,8 +24,8 @@
 
 // Define timing constants
 #define CLOCK_US 6
-#define MISO_INIT_US 80
-#define MOSI_INIT_US 150
+#define MISO_INIT_US 90
+#define MOSI_INIT_US 165
 #define FLASH_READY_US 260
 // Time between the start of one packet and the start of the next
 #define PACKET_INTERVAL_MS 16
