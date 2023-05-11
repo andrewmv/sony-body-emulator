@@ -18,12 +18,13 @@
 .wrap_target
     set y BYTECOUNT     side 0              ; Init byte counter
 newbyte:
+    set pins 0          side 0  [0]         ; Between bytes - set DATA low
     set x 7             side 0  [15]        ; Init bit counter, wait 64us 
     nop                 side 0  [15]        ; Wait another 64us (total 128us)
 bitloop:
     out pins 1          side 1  [1]         ; write DATA, set clock high, wait 8us
     jmp x-- bitloop     side 0  [1]         ; set clock low, branch, decrement bit counter, wait 8us
-    jmp y-- newbyte     side 0  [4]         ; wait 20us, branch, decrement byte counter
+    jmp y-- newbyte     side 0  [3]         ; wait 16us, branch, decrement byte counter
     set pins 1          side 0              ; Transfer complete - set DATA high
 halt:
     jmp halt            side 0
