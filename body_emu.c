@@ -100,12 +100,6 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
     // Arm the pre-flash
     assert_clk(FLASH_READY_US);
 
-    // // Wait for the flash to send back a READY frame  - a 90us clock pulse asserted by the flash
-    // if (wait_for_flash_ready(TIMEOUT_PF_READY_MS) == false) {
-    //     printf("PF READY Timeout\n");
-    //     return;
-    // }
-
     // Signal the pre-flash to strobe - a 90us clock pulse asserted by the body
     sleep_ms(15);
     assert_clk(MISO_INIT_US);
@@ -116,16 +110,11 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
 
     // Send an adjusted exposure flash initialization packet
     start_mosi_tx(body_packet_ef);
-    sleep_us(4300);
+    sleep_us(4300 + 3100);
 
     // Arm the exposure flash
     assert_clk(FLASH_READY_US);
-
-    // // Wait for the flash to send back another READY frame
-    // if (wait_for_flash_ready(TIMEOUT_EF_READY_MS) == false) {
-    //     printf("EF READY Timeout\n");
-    //     return;
-    // }
+    sleep_ms(10);
 
     // Trigger the exposure flash by pulling TRIG low
     assert_trig();
