@@ -4,9 +4,8 @@
 
 ; Pin mapping:
 ; OUT 0 = DATA
+; SET 0 = DATA
 ; SIDE 0 = CLK
-
-; Note that the physical wiring of these signals must be both consequtive and in this order
 
 ; The MOSI START pulse will have already been sent when the SM starts,
 ; so the first CLK pulse we send should be for a data bit
@@ -14,19 +13,19 @@
 .program tx_mosi
 .side_set 1
 
-.define T_BIT   1                       ; Cycles to wait between clock edges
-.define T_BYTE  15                      ; Cycles to wait between octets
-.define BYTECOUNT 4                     ; Number of octets to shift, minus one
+.define BYTECOUNT 13                        ; Number of octets to shift, minus one
 
 .wrap_target
-    set y BYTECOUNT     side 0  [T_BYTE]    ; Init byte counter, wait 64us
+    set y BYTECOUNT     side 0              ; Init byte counter
 newbyte:
-    set x 7             side 0  [T_BYTE]    ; Init bit counter, wait 64us
+    set pins 0          side 0  [0]         ; Between bytes - set DATA low
+    set x 7             side 0  [15]        ; Init bit counter, wait 64us 
+    nop                 side 0  [15]        ; Wait another 64us (total 128us)
 bitloop:
-    nop                 side 1  [T_BIT]     ; set clock high for 8us
-    out pins 1          side 0              ; write DATA, set clock low
-    jmp x-- bitloop     side 0              ; branch then decrement bit counter
-    jmp y-- newbyte     side 0  [T_BYTE]    ; wait, branch, then decrement byte counter
+    out pins 1          side 1  [1]         ; write DATA, set clock high, wait 8us
+    jmp x-- bitloop     side 0  [1]         ; set clock low, branch, decrement bit counter, wait 8us
+    jmp y-- newbyte     side 0  [3]         ; wait 16us, branch, decrement byte counter
+    set pins 1          side 0              ; Transfer complete - set DATA high
 halt:
     jmp halt            side 0
 .wrap
@@ -37,9 +36,10 @@ halt:
 static inline void tx_mosi_program_init(PIO pio, uint sm, uint offset, uint clkpin, uint datapin) {
     pio_sm_config c = tx_mosi_program_get_default_config(offset);
 
-    // Map Clock to SIDE pin 0, Data to OUT pin 0
+    // Map Clock to SIDE pin 0, Data to OUT pin 0 and SET pin 0
     sm_config_set_sideset_pins(&c, clkpin);
     sm_config_set_out_pins(&c, datapin, 1);
+    sm_config_set_set_pins(&c, datapin, 1);
 
     // Set pin function as PIO 
     pio_gpio_init(pio, clkpin);

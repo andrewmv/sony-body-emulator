@@ -17,8 +17,7 @@
 #include "rx-miso.pio.h"
 #include "tx-mosi.pio.h"
 
-/* Callback for RX DMA control chain (packet fully received)
-*/
+// Callback for RX DMA control chain (packet fully received)
 void dma_callback() {
     dma_channel_acknowledge_irq0(miso_dma_chan);
     // Stop the PIO from trying to clock in any more data
@@ -33,19 +32,103 @@ void dma_callback() {
     }
 }
 
-// Configure the PIOs and DMA for a flash-to-body transfer
-void start_miso_rx() {
-    // Track what state we're in (not using this yet)
-    state = STATE_RX_MISO;
+void uart_rx_callback() {
+    while (uart_is_readable(uart0)) {
+        uint8_t ch = uart_getc(uart0);
+        if (uart_is_writable(uart0)) {
+            if (ch == '\r') {
+                uart_puts(uart0, "\r\n");
+                state = STATE_METERING_PF;
+            } else if (ch == 'r') {
+                uart_puts(uart0, "\r\n");
+                state = STATE_READY;
+            } else {
+                uart_putc(uart0, ch);
+            }
+        }
+    }
+}
 
-    // Assert start pulse
+int64_t alarm_callback(alarm_id_t id, void *user_data) {
+    state = STATE_READY_TIMEOUT;
+    return 0;
+}
+
+// Take over control of the CLK GPIO and assert a pulse of time_us
+void assert_clk(uint16_t time_us) {
     gpio_init(CLK);
     gpio_set_dir(CLK, GPIO_OUT);
     gpio_put(CLK, 1);
-    sleep_us(MISO_INIT_US);
+    sleep_us(time_us);
     gpio_put(CLK, 0);
-    pio_gpio_init(miso_pio, CLK);
+}
 
+// Pull TRIG low for 15ms to fire the flash
+void assert_trig() {
+    gpio_put(TRIG, 0);
+    gpio_set_dir(TRIG, GPIO_OUT);
+    // gpio_set_outover(TRIG, GPIO_OVERRIDE_LOW);
+    sleep_ms(15);
+    // gpio_set_outover(TRIG, GPIO_OVERRIDE_NORMAL);
+    gpio_set_dir(TRIG, GPIO_IN);
+}
+
+// Take over control of the CLK GPIO and block until a 90us clock pulse is received
+bool wait_for_flash_ready(uint16_t timeout) {
+    gpio_init(CLK);
+    gpio_set_dir(CLK, GPIO_IN);
+    alarm_id_t ai = add_alarm_in_ms(timeout, alarm_callback, NULL, false);
+    while((gpio_get(CLK) == 0) && (state != STATE_READY_TIMEOUT)) {}
+    cancel_alarm(ai);
+    if (state == STATE_READY_TIMEOUT) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+// Start a simulation of a TTL metered flash
+// pf_power: The power of the pre-flash metering strobe (MOSI byte 10)
+// fe_power: The power of the final exposure flash, calculated through-the-lens based on the pre-flash
+void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
+    // Send pre-flash metering initialization packet
+    start_mosi_tx(body_packet_pf);
+
+    // Wait for packet to finish sending, then another 3.1ms
+    sleep_us(4300 + 3100);
+
+    // Arm the pre-flash
+    assert_clk(FLASH_READY_US);
+
+    // Signal the pre-flash to strobe - a 90us clock pulse asserted by the body
+    sleep_ms(15);
+    assert_clk(MISO_INIT_US);
+
+    // Spend ~50ms pretending to do TTL calculations
+    state = STATE_METERING_EF;
+    sleep_ms(50);
+
+    // Send an adjusted exposure flash initialization packet
+    start_mosi_tx(body_packet_ef);
+    sleep_us(4300 + 3100);
+
+    // Arm the exposure flash
+    assert_clk(FLASH_READY_US);
+    sleep_ms(10);
+
+    // Trigger the exposure flash by pulling TRIG low
+    assert_trig();
+}
+
+// Configure the PIOs and DMA for a flash-to-body transfer
+void start_miso_rx() {
+    // Assert start pulse
+    assert_clk(MISO_INIT_US);
+    // Add 412us to the built-in 128us built-in delay between the start pulse and the first bit to get to 540us
+    sleep_us(412);
+
+    // Hand GPIO control to PIO
+    pio_gpio_init(miso_pio, CLK);
     pio_gpio_init(miso_pio, DATA);
 
     // Restart and Enable PIO SM (sets ISR shift counter to Empty)
@@ -61,17 +144,12 @@ void start_miso_rx() {
 }
 
 // Configure the PIOs and DMA for a body-to-flash transfer
-void start_mosi_tx() {
-    // Track what state we're in (not using this yet)
-    state = STATE_TX_MOSI;
-    
+void start_mosi_tx(const u_int8_t *data) {
     // Assert start pulse
-    gpio_init(CLK);
-    gpio_set_dir(CLK, GPIO_OUT);
-    gpio_put(CLK, 1);
-    sleep_us(MOSI_INIT_US);
-    gpio_put(CLK, 0);
+    assert_clk(MOSI_INIT_US);
     pio_gpio_init(mosi_pio, CLK);
+    // Add 192us to the built-in 128us built-in delay between the start pulse and the first bit to get to 320us
+    sleep_us(192);
 
     // Attach DATA pin function to TX PIO and set direction
     pio_gpio_init(mosi_pio, DATA);
@@ -86,7 +164,7 @@ void start_mosi_tx() {
     pio_sm_exec_wait_blocking(mosi_pio, mosi_sm, pio_encode_jmp(mosi_offset));
 
     // Start DMA to fill RX FIFO
-    dma_channel_set_read_addr(mosi_dma_chan, body_packet, true);
+    dma_channel_set_read_addr(mosi_dma_chan, data, true);
 }
 
 // Configure DMA to feed data to the PIO state machine for
@@ -143,14 +221,16 @@ int main() {
     // Setup Serial
     stdio_init_all();
     printf("Body Emulator Ready\n");
+    irq_set_exclusive_handler(UART0_IRQ, uart_rx_callback);
+    irq_set_enabled(UART0_IRQ, true);
+    uart_set_irq_enables(uart0, true, false);
 
     // Setup GPIO
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
     gpio_init(TRIG);
-    gpio_set_dir(TRIG, GPIO_OUT);
-    gpio_pull_up(TRIG);
+    gpio_set_dir(TRIG, GPIO_IN);
 
     // Setup PIO State Machine
     miso_offset = pio_add_program(miso_pio, &rx_miso_program);
@@ -170,9 +250,23 @@ int main() {
     irq_set_enabled(DMA_IRQ_0, true);
 
     while(true) {
-        sleep_ms(15);
-        start_mosi_tx();
-        sleep_ms(15);
+        if (state == STATE_READY) {
+            start_mosi_tx(body_packet_ready);
+        } else {
+            start_mosi_tx(body_packet);
+        }
+        sleep_ms(PACKET_INTERVAL_MS);
         start_miso_rx();
+        sleep_ms(PACKET_INTERVAL_MS);
+        if (state == STATE_RECHARGE) {
+            sleep_ms(200);
+            state = STATE_STANDBY;
+        }
+        if (state == STATE_METERING_PF) {
+            sleep_ms(8);    // We need a double interval before the PF Init packet
+            simulate_ttl_flash(0, 0);
+            sleep_ms(20);
+            state = STATE_RECHARGE;
+        }
     }
 }
