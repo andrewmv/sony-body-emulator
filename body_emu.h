@@ -49,32 +49,41 @@
 #define flash_packet_length 26
 uint8_t old_flash_packet[flash_packet_length];
 uint8_t new_flash_packet[flash_packet_length];
+bool flash_packet_updated = false;
 
 // This must also be seperately defined as a constant in tx-mosi.pio
 #define body_packet_length 14
 
+bool body_packet_updated = false;
+
+uint8_t body_packet[body_packet_length];
+
 // State to report to flash when idle
-const uint8_t body_packet[] = {
+uint8_t body_packet_standby[] = {
     0x21,0xA9,0x2B,0xFF,0xAE,0xFD,0x40,0x40,0x6F,0x00,0xDE,0x75,0x80,0x00
 };
 
 // State that represents shutter button half-press
-const uint8_t body_packet_ready[] = {
+uint8_t body_packet_ready[] = {
     0x21,0xA9,0x2B,0xFF,0xAE,0xFD,0x40,0x40,0x6B,0x00,0xDE,0x75,0x80,0x00
 };
 
 // Pre-flash initialization packet
-const uint8_t body_packet_pf[] = {
+uint8_t body_packet_pf[] = {
     0x21,0xA9,0x2B,0xFF,0xAE,0x7D,0x40,0x40,0x5B,0xF8,0xC0,0x75,0x80,0x00
 };
 
 // Exposure flash correction packet
-const uint8_t body_packet_ef[] = {
+uint8_t body_packet_ef[] = {
     0x21,0xA9,0x2B,0xFF,0xAE,0x7D,0x40,0xC0,0x4B,0xE8,0xC0,0x75,0x80,0x00
 };
 
 volatile absolute_time_t risetime;
 volatile uint8_t state = STATE_STANDBY;
+
+#define uart_cmd_buffer_length 32
+uint8_t uart_cmd_buffer_pos = 0;
+uint8_t uart_cmd_buffer[uart_cmd_buffer_length];
 
 // DMA and PIO variables
 const PIO miso_pio = pio0;
@@ -88,14 +97,7 @@ const uint8_t mosi_sm = 0;
 uint8_t mosi_dma_chan;
 uint8_t mosi_offset;
 
+void process_uart_cmd();
 void miso_dma_setup(PIO pio, uint sm, uint dma_chan);
-void generate_clock_byte();
-void generate_clock_multibyte(int count);
 void start_miso_rx();
 void start_mosi_tx(const uint8_t *data);
-
-// Functions used for generating testing a testing clock when TESTCLOCK is defined
-void generate_miso_packet_clock();
-void generate_mosi_packet_clock();
-void generate_clock_byte();
-void generate_clock_multibyte(int count);
