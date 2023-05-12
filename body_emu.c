@@ -55,7 +55,7 @@ int64_t alarm_callback(alarm_id_t id, void *user_data) {
 }
 
 // Take over control of the CLK GPIO and assert a pulse of time_us
-void assert_clk(uint8_t time_us) {
+void assert_clk(uint16_t time_us) {
     gpio_init(CLK);
     gpio_set_dir(CLK, GPIO_OUT);
     gpio_put(CLK, 1);
@@ -93,14 +93,18 @@ bool wait_for_flash_ready(uint16_t timeout) {
 void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
     // Send pre-flash metering initialization packet
     start_mosi_tx(body_packet_pf);
-    // Wait for packet to finish sending 
-    sleep_us(4300);
 
-    // Wait for the flash to send back a READY frame  - a 90us clock pulse asserted by the flash
-    if (wait_for_flash_ready(TIMEOUT_PF_READY_MS) == false) {
-        printf("PF READY Timeout\n");
-        return;
-    }
+    // Wait for packet to finish sending, then another 3.1ms
+    sleep_us(4300 + 3100);
+
+    // Arm the pre-flash
+    assert_clk(FLASH_READY_US);
+
+    // // Wait for the flash to send back a READY frame  - a 90us clock pulse asserted by the flash
+    // if (wait_for_flash_ready(TIMEOUT_PF_READY_MS) == false) {
+    //     printf("PF READY Timeout\n");
+    //     return;
+    // }
 
     // Signal the pre-flash to strobe - a 90us clock pulse asserted by the body
     sleep_ms(15);
@@ -114,11 +118,14 @@ void simulate_ttl_flash(uint8_t pf_power, uint8_t ef_power) {
     start_mosi_tx(body_packet_ef);
     sleep_us(4300);
 
-    // Wait for the flash to send back another READY frame
-    if (wait_for_flash_ready(TIMEOUT_EF_READY_MS) == false) {
-        printf("EF READY Timeout\n");
-        return;
-    }
+    // Arm the exposure flash
+    assert_clk(FLASH_READY_US);
+
+    // // Wait for the flash to send back another READY frame
+    // if (wait_for_flash_ready(TIMEOUT_EF_READY_MS) == false) {
+    //     printf("EF READY Timeout\n");
+    //     return;
+    // }
 
     // Trigger the exposure flash by pulling TRIG low
     assert_trig();
