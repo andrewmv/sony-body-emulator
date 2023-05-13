@@ -98,7 +98,16 @@ void process_uart_cmd() {
     } else if (cmd == 'f') {
         // Execute a flash metering transaction next cycle
         state = STATE_METERING_PF;
-    } 
+    } else if (cmd == 's') {
+        // Set an arbitrary byte in the body data
+        u_int8_t updatepos = (((uart_cmd_buffer[1] - '0') * 10) + uart_cmd_buffer[2] - '0');
+        u_int8_t newbyte = strToByte(uart_cmd_buffer[3], uart_cmd_buffer[4]);
+        body_packet[updatepos] = newbyte;
+        body_packet_standby[updatepos] = newbyte;
+        body_packet_ready[updatepos] = newbyte;
+        body_packet_pf[updatepos] = newbyte;
+        body_packet_ef[updatepos] = newbyte;
+    }
     body_packet_updated = true;
 }
 
