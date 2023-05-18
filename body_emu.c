@@ -33,8 +33,11 @@ void dma_callback() {
     pio_sm_set_enabled(miso_pio, miso_sm, false);
     // Compare new rx'd packet to old one, and print it if they differ
     if (memcmp(old_flash_packet, new_flash_packet, flash_packet_length) != 0) {
-        memcpy(old_flash_packet, new_flash_packet, flash_packet_length);
-        flash_packet_updated = true;
+        // Ignore entire transaction if accessory detect byte isn't 0xff
+        if (new_flash_packet[0] == 0xff) {
+            memcpy(old_flash_packet, new_flash_packet, flash_packet_length);
+            flash_packet_updated = true;
+        }
     }
 }
 
