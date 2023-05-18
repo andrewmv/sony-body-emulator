@@ -151,14 +151,14 @@ void simulate_ttl_flash() {
     uart_puts(uart0, "\r\nPF:");
     print_body_state(body_packet_pf);
 
-    // Wait for packet to finish sending, then another 3.1ms
-    sleep_us(4300 + 3100);
+    // Wait for packet to finish sending, then another 2.5ms
+    sleep_us(4500);
 
     // Arm the pre-flash
     assert_clk(FLASH_READY_US);
 
     // Signal the pre-flash to strobe - a 90us clock pulse asserted by the body
-    sleep_ms(15);
+    sleep_ms(30);
     assert_clk(MISO_INIT_US);
 
     // Spend ~50ms pretending to do TTL calculations
@@ -169,13 +169,13 @@ void simulate_ttl_flash() {
     start_mosi_tx(body_packet_ef);
     uart_puts(uart0, "\r\nEF:");
     print_body_state(body_packet_ef);
-    sleep_us(4300 + 3100);
+    sleep_us(4000 + 2500);
 
     // Arm the exposure flash
     assert_clk(FLASH_READY_US);
-    sleep_ms(10);
 
     // Trigger the exposure flash by pulling TRIG low
+    sleep_ms(30);
     assert_trig();
 }
 
@@ -208,11 +208,13 @@ void start_mosi_tx(const u_int8_t *data) {
     assert_clk(MOSI_INIT_US);
     pio_gpio_init(mosi_pio, CLK);
     // Add 192us to the built-in 128us built-in delay between the start pulse and the first bit to get to 320us
-    sleep_us(192);
+    // Then add a bodge number
+    sleep_us(192 - 16);
 
     // Attach DATA pin function to TX PIO and set direction
     pio_gpio_init(mosi_pio, DATA);
     pio_sm_set_consecutive_pindirs(mosi_pio, mosi_sm, DATA, 2, true);
+    gpio_set_drive_strength(DATA, GPIO_DRIVE_STRENGTH_12MA);
 
     // Restart and Enable PIO SM (sets OSR shift counter to Empty)
     uint32_t restart_mask = (1u << PIO_CTRL_SM_RESTART_LSB << mosi_sm);
