@@ -52,7 +52,8 @@ static inline void tx_mosi_program_init(PIO pio, uint sm, uint offset, uint clkp
     sm_config_set_out_shift(&c, true, true, 8);
 
     // Setup clock divider - we want each PIO cycle to be about 4us
-    float div = clock_get_hz(clk_sys) / 125000 / 2;
+    // float div = clock_get_hz(clk_sys) / 125000 / 2;
+    float div = 475.0;
     sm_config_set_clkdiv(&c, div);
 
     // Load our configuration, and jump to the start of the program

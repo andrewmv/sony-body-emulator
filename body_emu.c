@@ -172,7 +172,7 @@ void simulate_ttl_flash() {
     start_mosi_tx(body_packet_ef);
     uart_puts(uart0, "\r\nEF:");
     print_body_state(body_packet_ef);
-    sleep_us(4000 + 2500);
+    sleep_us(4500);
 
     // Arm the exposure flash
     assert_clk(FLASH_READY_US);
