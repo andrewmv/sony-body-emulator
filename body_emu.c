@@ -155,30 +155,30 @@ void simulate_ttl_flash() {
     print_body_state(body_packet_pf);
 
     // Wait for packet to finish sending, then another 2.5ms
-    sleep_us(4500);
+    sleep_us(4400);
 
     // Arm the pre-flash
     assert_clk(FLASH_READY_US);
 
     // Signal the pre-flash to strobe - a 90us clock pulse asserted by the body
-    sleep_ms(30);
+    sleep_ms(28);
     assert_clk(MISO_INIT_US);
 
     // Spend ~50ms pretending to do TTL calculations
     state = STATE_METERING_EF;
-    sleep_ms(50);
+    sleep_ms(48);
 
     // Send an adjusted exposure flash initialization packet
     start_mosi_tx(body_packet_ef);
     uart_puts(uart0, "\r\nEF:");
     print_body_state(body_packet_ef);
-    sleep_us(4500);
+    sleep_us(4400);
 
     // Arm the exposure flash
     assert_clk(FLASH_READY_US);
 
     // Trigger the exposure flash by pulling TRIG low
-    sleep_ms(30);
+    sleep_ms(28);
     assert_trig();
 }
 
